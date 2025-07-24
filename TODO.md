@@ -1,0 +1,14 @@
+- [ ] LOGIC
+- [ ] comms: recieve commands
+- [ ] comms: reply
+- [ ] comms: send back readings
+- [ ] comms: modify variables
+- [ ] extended: low power mode
+- [x] output: clamp
+- [ ] output: lower frequency
+- [ ] output: attach heaters
+- [x] input: adc: sample
+- [ ] input: adc: average
+- [x] input: adc: convert
+- [ ] input: digital thermo (hopefully find library)
+- [ ] Input: convert (ntc resistors)
