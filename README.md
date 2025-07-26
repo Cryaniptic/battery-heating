@@ -8,3 +8,4 @@ Ideally I would jlink or serial wire debug over an ST-link, however due to unkno
 
 If another contributor takes a shot at this you may need to tweak the full_build.sh script, as this was made in and for linux, using some CLI utilities to streamline development.
 
+[notepad](https://cyber.dabamos.de/88x31/notepad-logo3.gif)
