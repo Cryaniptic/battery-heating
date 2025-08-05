@@ -714,7 +714,7 @@ PUTCHAR_PROTOTYPE
 
 void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *I2cHandle)
 {
-  printf("Transfer out completed\n");
+  printf("Transmitted: %d %d %d %d \n", aTxBuffer[0], aTxBuffer[1], aTxBuffer[2], aTxBuffer[3]);
   Xfer_Complete = 1;
   aTxBuffer[0]++;
   aTxBuffer[1]++;
@@ -733,11 +733,12 @@ void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *I2cHandle)
   */
 void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *I2cHandle)
 {
+  printf("recieved: %d %d %d %d \n", aRxBuffer[0], aRxBuffer[1], aRxBuffer[2], aRxBuffer[3]);
   Xfer_Complete = 1;
-  aRxBuffer[0]=0x00;
-  aRxBuffer[1]=0x00;
-  aRxBuffer[2]=0x00;
-  aRxBuffer[3]=0x00;
+  // aRxBuffer[0]=0x00;
+  // aRxBuffer[1]=0x00;
+  // aRxBuffer[2]=0x00;
+  // aRxBuffer[3]=0x00;
 }
 
 
@@ -753,30 +754,28 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *I2cHandle)
 // This function is called when the address on the i2c bus matches this devices
 void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode)
 {
+  // printf("Address match code: %d\n", AddrMatchCode); //this is just what the devices address is (left shifted by one aswell)
   Transfer_Direction = TransferDirection;
+  // printf("Transfer Direction: %d \n", Transfer_Direction);
   if (Transfer_Direction != 0)
   {
-     /*##- Start the transmission process #####################################*/
-  /* While the I2C in reception process, user can transmit data through
-     "aTxBuffer" buffer */
-  if (HAL_I2C_Slave_Seq_Transmit_IT(&hi2c1, (uint8_t *)aTxBuffer, TXBUFFERSIZE, I2C_FIRST_AND_LAST_FRAME) != HAL_OK)
-
+    /*##- Start the transmission process #####################################*/
+    /* While the I2C in reception process, user can transmit data through "aTxBuffer" buffer */
+    if (HAL_I2C_Slave_Seq_Transmit_IT(&hi2c1, (uint8_t *)aTxBuffer, TXBUFFERSIZE, I2C_FIRST_AND_LAST_FRAME) != HAL_OK)
     {
     /* Transfer error in transmission process */
     Error_Handler();
-  }
-
+    }
   }
   else
   {
-
-      /*##- Put I2C peripheral in reception process ###########################*/
-  if (HAL_I2C_Slave_Seq_Receive_IT(&hi2c1, (uint8_t *)aRxBuffer, RXBUFFERSIZE, I2C_FIRST_AND_LAST_FRAME) != HAL_OK)
+    /*##- Put I2C peripheral in reception process ###########################*/
+    if (HAL_I2C_Slave_Seq_Receive_IT(&hi2c1, (uint8_t *)aRxBuffer, RXBUFFERSIZE, I2C_FIRST_AND_LAST_FRAME) != HAL_OK)
     {
-    /* Transfer error in reception process */
-    Error_Handler();
-  }
-  printf("recieved: %d %d %d %d \n", aRxBuffer[0], aRxBuffer[1], aRxBuffer[2], aRxBuffer[3]);
+      /* Transfer error in reception process */
+      Error_Handler();
+    }
+  // printf("recieved: %d %d %d %d \n", aRxBuffer[0], aRxBuffer[1], aRxBuffer[2], aRxBuffer[3]);
   }
 
 }
