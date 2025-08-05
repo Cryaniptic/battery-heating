@@ -23,6 +23,8 @@
 /* USER CODE BEGIN Includes */
 
 #include <stdio.h>
+#include <stdint.h>
+
 //#include "serial.h"
 
 /* USER CODE END Includes */
@@ -40,7 +42,13 @@
 #define SUPPLY_VOLTAGE 3.3  //voltage supplied to the adc (used in calculations)
 #define ADC_RESOLUTION 4096 //adc resolution (max value of a 12b number)
 
+#define COUNTOF(__BUFFER__)   (sizeof(__BUFFER__) / sizeof(*(__BUFFER__)))
+/* Size of Transmission buffer */
+#define TXBUFFERSIZE                      (COUNTOF(aTxBuffer))
+/* Size of Reception buffer */
+#define RXBUFFERSIZE                      TXBUFFERSIZE
 
+/* USER CODE END Includes */
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -72,7 +80,16 @@ float tempThres = 30.0;
 /* Variable containing ADC conversions data */
 static uint16_t   aADCxConvertedData[ADC_CONVERTED_DATA_BUFFER_SIZE];
 
+uint8_t count = 0;
+
+/* Buffer used for transmission */
+uint8_t aTxBuffer[4];
+
+/* Buffer used for reception */
+uint8_t aRxBuffer[4];
+
 /* USER CODE END PV */
+
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -83,6 +100,13 @@ static void MX_I2C1_Init(void);
 static void MX_TIM22_Init(void);
 static void MX_USART2_Init(void);
 /* USER CODE BEGIN PFP */
+
+void active() {
+  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+}
+void inactive() {
+  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+}
 
 //needed to get printf working (redirects subfunction to send char* to UART)
 #define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
@@ -100,6 +124,7 @@ long map(long x, long in_min, long in_max, long out_min, long out_max) {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
+// === TEMP FUNCTIONS 
 //conversion function (adc reading -> voltage float)
 float adcToVoltage(uint16_t reading) {
   return reading * SUPPLY_VOLTAGE / ADC_RESOLUTION;
@@ -109,6 +134,16 @@ float adcToVoltage(uint16_t reading) {
 float voltageToMCP(float volt) {
   return (volt-0.5)/0.01;
 }
+
+// === I2C FUNCTIONS
+__IO uint32_t     Transfer_Direction = 0;
+__IO uint32_t     Xfer_Complete = 0;
+
+/* Buffer used for transmission */
+uint8_t aTxBuffer[4];
+
+/* Buffer used for reception */
+uint8_t aRxBuffer[4];
 
 /* USER CODE END PFP */
 
@@ -139,6 +174,14 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+  aRxBuffer[0]=0x00;
+  aRxBuffer[1]=0x00;
+  aRxBuffer[2]=0x00;
+  aRxBuffer[3]=0x00;
+  aTxBuffer[0]=0xAA;
+  aTxBuffer[1]=0xBB;
+  aTxBuffer[2]=0xCC;
+  aTxBuffer[3]=0xDD;
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -157,6 +200,8 @@ int main(void)
   MX_USART2_Init();
   /* USER CODE BEGIN 2 */
   
+  active();
+
   //start the ADC/DMA cycle
   if (HAL_ADC_Start_DMA(&hadc,
                         (uint32_t *)aADCxConvertedData,
@@ -166,6 +211,13 @@ int main(void)
     Error_Handler();
   }
   
+  // I2C start listening
+  if(HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
+  {
+    /* Transfer error in reception process */
+    Error_Handler();
+  }
+
   // Init pwm
   HAL_TIM_PWM_Init(&htim22);
   
@@ -177,6 +229,8 @@ int main(void)
   // __HAL_TIM_SET_COMPARE(&htim22, TIM_CHANNEL_1, 0);
   // __HAL_TIM_SET_COMPARE(&htim22, TIM_CHANNEL_2, 65535);
 
+  inactive();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -187,8 +241,22 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     
+    active();
+
     //clear screen (only works on linux)
-    printf("\033[2J");
+    // printf("\033[2J");
+
+    if (Xfer_Complete ==1)
+    {
+      HAL_Delay(1);
+      /*##- Put I2C peripheral in listen mode process ###########################*/
+      if(HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
+      {
+        /* Transfer error in reception process */
+        Error_Handler();
+      }
+      Xfer_Complete =0;
+    }
 
     /*
     for (uint8_t i = 0; i < ADC_CONVERTED_DATA_BUFFER_SIZE; i++) {
@@ -206,11 +274,11 @@ int main(void)
     float tempAve = (temp1+temp2+temp3)/3;
 
     //print ave
-    printf("Temp average: %d °C\n", (uint16_t)tempAve);
+    // printf("Temp average: %d °C\n", (uint16_t)tempAve);
     
     //very basic bang bang algo
     if (tempAve <= tempThres) {
-      printf("Heater ON\n");
+      // printf("Heater ON\n");
       __HAL_TIM_SET_COMPARE(&htim22, TIM_CHANNEL_1, max_pwm_value);
       __HAL_TIM_SET_COMPARE(&htim22, TIM_CHANNEL_2, max_pwm_value);
     } else {
@@ -222,6 +290,7 @@ int main(void)
 
     //i += 100;
 
+    inactive();
     //HAL_Delay(100);
   }
   /* USER CODE END 3 */
@@ -427,8 +496,8 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.Timing = 0x00503D58;
-  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.Timing = 0x00300625;
+  hi2c1.Init.OwnAddress1 = 96;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
   hi2c1.Init.OwnAddress2 = 0;
@@ -635,6 +704,114 @@ PUTCHAR_PROTOTYPE
 }
 
 
+/**
+  * @brief  Tx Transfer completed callback.
+  *   I2cHandle: I2C handle.
+  * @note   This example shows a simple way to report end of IT Tx transfer, and
+  *         you can add your own implementation.
+  * @retval None
+  */
+
+void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *I2cHandle)
+{
+  printf("Transfer out completed\n");
+  Xfer_Complete = 1;
+  aTxBuffer[0]++;
+  aTxBuffer[1]++;
+  aTxBuffer[2]++;
+  aTxBuffer[3]++;
+
+}
+
+
+/**
+  * @brief  Rx Transfer completed callback.
+  *   I2cHandle: I2C handle
+  * @note   This example shows a simple way to report end of IT Rx transfer, and
+  *         you can add your own implementation.
+  * @retval None
+  */
+void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *I2cHandle)
+{
+  Xfer_Complete = 1;
+  aRxBuffer[0]=0x00;
+  aRxBuffer[1]=0x00;
+  aRxBuffer[2]=0x00;
+  aRxBuffer[3]=0x00;
+}
+
+
+
+/**
+  * @brief  Slave Address Match callback.
+  *   hi2c Pointer to a I2C_HandleTypeDef structure that contains
+  *                the configuration information for the specified I2C.
+  *   TransferDirection: Master request Transfer Direction (Write/Read), value of @ref I2C_XferOptions_definition
+  *   AddrMatchCode: Address Match Code
+  * @retval None
+  */
+// This function is called when the address on the i2c bus matches this devices
+void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode)
+{
+  Transfer_Direction = TransferDirection;
+  if (Transfer_Direction != 0)
+  {
+     /*##- Start the transmission process #####################################*/
+  /* While the I2C in reception process, user can transmit data through
+     "aTxBuffer" buffer */
+  if (HAL_I2C_Slave_Seq_Transmit_IT(&hi2c1, (uint8_t *)aTxBuffer, TXBUFFERSIZE, I2C_FIRST_AND_LAST_FRAME) != HAL_OK)
+
+    {
+    /* Transfer error in transmission process */
+    Error_Handler();
+  }
+
+  }
+  else
+  {
+
+      /*##- Put I2C peripheral in reception process ###########################*/
+  if (HAL_I2C_Slave_Seq_Receive_IT(&hi2c1, (uint8_t *)aRxBuffer, RXBUFFERSIZE, I2C_FIRST_AND_LAST_FRAME) != HAL_OK)
+    {
+    /* Transfer error in reception process */
+    Error_Handler();
+  }
+  printf("recieved: %d %d %d %d \n", aRxBuffer[0], aRxBuffer[1], aRxBuffer[2], aRxBuffer[3]);
+  }
+
+}
+
+/**
+  * @brief  Listen Complete callback.
+  *   hi2c Pointer to a I2C_HandleTypeDef structure that contains
+  *                the configuration information for the specified I2C.
+  * @retval None
+  */
+void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+}
+
+/**
+  * @brief  I2C error callbacks.
+  *   I2cHandle: I2C handle
+  * @note   This example shows a simple way to report transfer error, and you can
+  *         add your own implementation.
+  * @retval None
+  */
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *I2cHandle)
+{
+  /** Error_Handler() function is called when error occurs.
+    * 1- When Slave doesn't acknowledge its address, Master restarts communication.
+    * 2- When Master doesn't acknowledge the last data transferred, Slave doesn't care in this example.
+    */
+  if (HAL_I2C_GetError(I2cHandle) != HAL_I2C_ERROR_AF)
+  {
+    printf("I2C ERROR :(\n");
+    // Error_Handler();
+  }
+}
+
+
 /* USER CODE END 4 */
 
 /**
@@ -651,8 +828,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
