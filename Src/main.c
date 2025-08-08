@@ -88,6 +88,9 @@ uint8_t aTxBuffer[4];
 /* Buffer used for reception */
 uint8_t aRxBuffer[4];
 
+// buffer for requested memory address
+uint8_t memRequest = 0;
+
 /* USER CODE END PV */
 
 
@@ -752,11 +755,12 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *I2cHandle)
   * @retval None
   */
 // This function is called when the address on the i2c bus matches this devices
+// Keep printfs out of this function, it will slow down, instead print in SlaveRxCpltCallback RX/TX
 void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode)
 {
   // printf("Address match code: %d\n", AddrMatchCode); //this is just what the devices address is (left shifted by one aswell)
   Transfer_Direction = TransferDirection;
-  // printf("Transfer Direction: %d \n", Transfer_Direction);
+  printf("Transfer Direction: %d \n", Transfer_Direction);
   if (Transfer_Direction != 0)
   {
     /*##- Start the transmission process #####################################*/
@@ -770,14 +774,16 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
   else
   {
     /*##- Put I2C peripheral in reception process ###########################*/
+    HAL_I2C_Slave_Receive_IT(&hi2c1, &memRequest, 1); 
     if (HAL_I2C_Slave_Seq_Receive_IT(&hi2c1, (uint8_t *)aRxBuffer, RXBUFFERSIZE, I2C_FIRST_AND_LAST_FRAME) != HAL_OK)
     {
       /* Transfer error in reception process */
       Error_Handler();
     }
-  // printf("recieved: %d %d %d %d \n", aRxBuffer[0], aRxBuffer[1], aRxBuffer[2], aRxBuffer[3]);
+    // printf("recieved: %d %d %d %d \n", aRxBuffer[0], aRxBuffer[1], aRxBuffer[2], aRxBuffer[3]);
   }
 
+  printf("Address requested was: %d \n", memRequest);
 }
 
 /**
