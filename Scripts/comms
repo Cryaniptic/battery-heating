@@ -1,0 +1,11 @@
+#!/bin/bash
+
+
+
+sudo i2cget -y 13 0x30 0x01 i 4 |
+  while IFS= read -r line
+  do
+    echo "$line"
+  done
+
+
