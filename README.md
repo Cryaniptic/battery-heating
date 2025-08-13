@@ -8,6 +8,11 @@ Ideally I would jlink or serial wire debug over an ST-link, however due to unkno
 
 If another contributor takes a shot at this you may need to tweak the full_build.sh script, as this was made in and for linux, using some CLI utilities to streamline development.
 
+Full list of tools used to build, upload and communicate
+ - Make
+ - arm-none-eabi-gcc + arm-none-eabi-newlib (for printing unitilites)
+ - STM32cubeProgrammerCLI
+ - Serust (just for serial monitor)
 
 ![notepad](https://cyber.dabamos.de/88x31/vim.vialle.love.anim.gif) ![coffee](https://cyber.dabamos.de/88x31/coffee.gif)
 
